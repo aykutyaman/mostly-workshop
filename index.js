@@ -1,18 +1,16 @@
 const {
   Maybe,
-  Container
+  Container,
+  Either,
+  Left,
 } = require('./algebraic-structures')
 
+const {
+  curry,
+  maybe
+} = require('./essentials')
+
 // ------------------ Pointfree Utilities -----------
-const curry = (fn) => {
-  const arity = fn.length;
-  return function $curry(...args) {
-    if (args.length < fn.length) {
-      return $curry.bind(null, ...args);
-    }
-    return fn.call(null, ...args);
-  };
-};
 const reduce = curry((fn, zero, xs) => xs.reduce(fn, zero));
 
 const reducer = (acc, fn) => [fn.call(null, ...acc)]
@@ -139,5 +137,28 @@ const getTwenty = compose(map(finishTransaction), withdraw(20))
 getTwenty({ balance: 200.00 })
 // Just('Your balance is $180')
 
-// Releasing the value
-// ...
+getTwenty({ balance: 10.00 })
+// Nothing
+
+// getThirty :: Account -> String
+const getThirty = compose(maybe("You're broke!", finishTransaction), withdraw(30))
+
+getThirty({ balance: 200 })
+// Your balance is $170.00
+
+getThirty({ balance: 20 })
+// You're broke!
+
+
+Either.of('rain').map(str => `b${str}`)
+// Right('brain')
+
+const left = x => new Left(x)
+left('rain').map(str => `It's gonna ${str}, better bring your umbrella!`)
+// Left('rain')
+
+Either.of({ host: 'localhost', port: 80 }).map(prop('host'))
+// Right('localhost')
+
+left('roll eyes...').map(prop('host'))
+// Left('roll eyes...')
