@@ -1,4 +1,7 @@
-const { inspect } = require('./essentials')
+const {
+  inspect,
+  compose
+} = require('./essentials')
 
 class Maybe {
   static of(x) {
@@ -46,6 +49,14 @@ class Either {
 }
 
 class Left extends Either {
+  get isLeft() {
+    return true
+  }
+
+  get isRight() {
+    return false
+  }
+
   map(f) {
     return this;
   }
@@ -53,9 +64,18 @@ class Left extends Either {
   inspect() {
     return `Left(${inspect(this.$value)})`
   }
+
 }
 
 class Right extends Either {
+  get isLeft() {
+    return false
+  }
+
+  get isRight() {
+    return true
+  }
+
   map(f) {
     return Either.of(f(this.$value))
   }
@@ -65,9 +85,32 @@ class Right extends Either {
   }
 }
 
+class IO {
+  static of(x) {
+    return new IO(() => x)
+  }
+
+  constructor(io) {
+    this.unsafePerformIO = io
+  }
+
+  map(fn) {
+    return new IO(compose(fn, this.unsafePerformIO))
+  }
+
+  join() {
+    return this.$value()
+  }
+
+  inspect() {
+    return `IO(${inspect(this.$value)})`
+  }
+}
+
 module.exports = {
   Maybe,
   Container,
   Either,
-  Left
+  Left,
+  IO
 }

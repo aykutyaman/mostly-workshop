@@ -3,19 +3,25 @@ const {
   Container,
   Either,
   Left,
+  IO
 } = require('./algebraic-structures')
 
 const {
   curry,
-  maybe
+  compose,
+  maybe,
+  either
 } = require('./essentials')
+
+const {
+  toString,
+  id,
+  filter,
+  eq
+} = require('./pointfree-utilities')
 
 // ------------------ Pointfree Utilities -----------
 const reduce = curry((fn, zero, xs) => xs.reduce(fn, zero));
-
-const reducer = (acc, fn) => [fn.call(null, ...acc)]
-
-const compose = (...fns) => (...args) => fns.reduceRight(reducer, args)[0];
 
 const toUpperCase = x => x.toUpperCase()
 
@@ -38,7 +44,8 @@ const map = curry((fn, f) => f.map(fn))
 
 const join = curry((pattern, xs) => xs.join(pattern))
 
-const concat = curry((s1, s2) => s2.concat(s1))
+// concat :: String -> String -> String
+const concat = curry((s1, s2) => s1.concat(s2))
 
 // prop :: String -> Object -> a
 const prop = curry((p, obj) => obj[p])
@@ -162,3 +169,104 @@ Either.of({ host: 'localhost', port: 80 }).map(prop('host'))
 
 left('roll eyes...').map(prop('host'))
 // Left('roll eyes...')
+
+const moment = require('moment')
+
+// getAge :: Date -> User -> Either(String, Number)
+const getAge = curry((now, user) => {
+  const birthDate = moment(user.birthDate, 'YYYY-MM-DD')
+
+  return birthDate.isValid()
+    ? Either.of(now.diff(birthDate, 'years'))
+    : left('Birth date could not be parsed')
+})
+
+getAge(moment(), { birthDate: '2005-12-12' })
+// Right(9)
+
+getAge(moment(), { birthDate: 'July 4, 2001' })
+// Left('Birth date could not be parsed')
+
+// fortune :: Number -> String
+const fortune = compose(concat('If you survive, you will be '), toString, add(1))
+
+// zoltar :: User -> Either(String, _)
+const zoltar = compose(map(console.log), map(fortune), getAge(moment()))
+
+zoltar({ birthDate: '2005-12-12' })
+// 'If you survive, you will be 13'
+// Right(undefined)
+
+zoltar({ birthDate: 'ballons!' })
+// Left('Birth date could not be parsed')
+
+// zoltar2 :: User -> _
+const zoltar2 = compose(console.log, either(id, fortune), getAge(moment()))
+
+zoltar2({ birthDate: '2005-12-12' })
+// If you survive, you will be 13
+// undefined
+
+zoltar2({ birthDate: 'balloons!' })
+// 'Birth date could not be parsed'
+// undefined
+
+
+// window stub
+const window = {
+  innerWidth: 1430,
+  location: {
+    href: 'http://localhost:8000/blog/posts?searchTerm=wafflehouse&foo=bar'
+  }
+}
+
+// ioWindow :: IO Window
+const ioWindow = new IO(() => window)
+
+// Note that, to simplfy reading, we'll show the hypothetical value contained
+// in the `IO` as result; however in practice, you can't tell what this value is
+// until you're actually unleashed the effects!
+
+ioWindow.map(win => win.innerWidth)
+// IO(1430)
+
+ioWindow
+  .map(prop('location'))
+  .map(prop('href'))
+  .map(split('/'))
+// IO(['http:', '', 'localhost:8000', 'blog', 'posts'])
+
+// document stub
+const document = {
+  querySelectorAll: (selector) => {
+    return [
+      {
+        innerHTML: "I am some inner html"
+      }
+    ]
+  }
+}
+
+// $ :: String -> IO [DOM]
+const $ = selector => new IO(() => document.querySelectorAll(selector))
+
+$("#myDiv").map(head).map(div => div.innerHTML)
+// IO("I am some inner html")
+
+// url :: IO String
+const url = new IO(() => window.location.href)
+
+// toPairs :: String -> [[String]]
+const toPairs = compose(map(split('=')), split('&'))
+
+// params :: String -> [[String]]
+const params = compose(toPairs, last, split('?'))
+
+// findParam :: String -> IO Maybe [String]
+const findParam = key => map(compose(Maybe.of, filter(compose(eq(key), head)), params), url)
+
+// -- Impure calling code ----------------------------------------------
+
+// run it by calling $value()!
+findParam('searchTerm').unsafePerformIO()
+// Just([['searchTerm', 'wafflehouse']])

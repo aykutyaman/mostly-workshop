@@ -1,3 +1,8 @@
+const {
+  Left,
+  Right
+} = require('./algebraic-structures')
+
 // curry :: ((a, b, ...) -> c) -> a -> b -> ... -> c
 const curry = (fn) => {
   const arity = fn.length;
@@ -9,6 +14,12 @@ const curry = (fn) => {
   };
 };
 
+
+
+// compose :: ((a -> b), (b -> c),  ..., (y -> z)) -> a -> z
+const compose = (...fns) => (...args) => fns.reduceRight(reducer, args)[0];
+
+const reducer = (acc, fn) => [fn.call(null, ...acc)]
 
 // inspect :: a -> String
 const inspect = (x) => {
@@ -48,8 +59,19 @@ const maybe = curry((v, f, m) => {
   return f(m.$value)
 })
 
+// either :: (a -> c) -> (b -> c) -> Either a b -> c
+const either = curry((f, g, e) => {
+  if (e.isLeft) {
+    return f(e.$value)
+  }
+
+  return g(e.$value)
+})
+
 module.exports = {
   curry,
+  compose,
   inspect,
-  maybe
+  maybe,
+  either
 };
