@@ -17,8 +17,13 @@ const {
   toString,
   id,
   filter,
-  eq
+  eq,
+  join,
+  chain
 } = require('./pointfree-utilities')
+
+const fs = require('fs')
+const Task = require('data.task')
 
 // ------------------ Pointfree Utilities -----------
 const reduce = curry((fn, zero, xs) => xs.reduce(fn, zero));
@@ -42,13 +47,16 @@ const split = curry((pattern, str) => str.split(pattern))
 // map :: Functor f -> (a -> b) -> f a -> f b
 const map = curry((fn, f) => f.map(fn))
 
-const join = curry((pattern, xs) => xs.join(pattern))
+const joinArr = curry((pattern, xs) => xs.join(pattern))
 
 // concat :: String -> String -> String
 const concat = curry((s1, s2) => s1.concat(s2))
 
 // prop :: String -> Object -> a
 const prop = curry((p, obj) => obj[p])
+
+// safeProp :: String -> Object -> Maybe a
+const safeProp = curry((p, obj) => compose(Maybe.of, prop(p))(obj))
 
 const trace = curry((tag, x) => console.log(tag, x) || x)
 
@@ -70,9 +78,9 @@ const toLowerCase = x => x.toLowerCase()
 const replace = curry((re, rpl, str) => str.replace(re, rpl))
 const snakeCase = compose(replace(/\s+/ig, '_'), toLowerCase)
 
-snakeCase("Hello World") // "hello_world"
+snakeCase('Hello World') // 'hello_world'
 
-const initials = compose(join('. '), map(compose(toUpperCase, head)), split(' '))
+const initials = compose(joinArr('. '), map(compose(toUpperCase, head)), split(' '))
 
 initials('hunter stockton thompson') // 'H. S. T.'
 
@@ -81,7 +89,7 @@ const latin = compose(map(angry), reverse)
 latin(['frog', 'eyes']) // ['EYES!', 'FROG!']
 
 const dasherize = compose(
-  join('-'),
+  joinArr('-'),
   map(toLowerCase),
   split(' '),
   replace(/\s{2,}/ig, ' ')
@@ -106,10 +114,10 @@ Maybe.of('Malkovic Malkovic').map(match(/a/gi))
 Maybe.of(null).map(match(/z/ig))
 // Nothing
 
-Maybe.of({ name: "boris" }).map(prop('age')).map(add(10))
+Maybe.of({ name: 'boris' }).map(prop('age')).map(add(10))
 // Nothing
 
-Maybe.of({ name: "boris", age: 36 }).map(prop('age')).map(add(10))
+Maybe.of({ name: 'boris', age: 36 }).map(prop('age')).map(add(10))
 // Just(46)
 
 // streetName :: Object -> Maybe String
@@ -148,7 +156,7 @@ getTwenty({ balance: 10.00 })
 // Nothing
 
 // getThirty :: Account -> String
-const getThirty = compose(maybe("You're broke!", finishTransaction), withdraw(30))
+const getThirty = compose(maybe('You are broke!', finishTransaction), withdraw(30))
 
 getThirty({ balance: 200 })
 // Your balance is $170.00
@@ -241,7 +249,7 @@ const document = {
   querySelectorAll: (selector) => {
     return [
       {
-        innerHTML: "I am some inner html"
+        innerHTML: 'I am some inner html'
       }
     ]
   }
@@ -250,8 +258,8 @@ const document = {
 // $ :: String -> IO [DOM]
 const $ = selector => new IO(() => document.querySelectorAll(selector))
 
-$("#myDiv").map(head).map(div => div.innerHTML)
-// IO("I am some inner html")
+$('#myDiv').map(head).map(div => div.innerHTML)
+// IO('I am some inner html')
 
 // url :: IO String
 const url = new IO(() => window.location.href)
@@ -270,3 +278,83 @@ const findParam = key => map(compose(Maybe.of, filter(compose(eq(key), head)), p
 // run it by calling $value()!
 findParam('searchTerm').unsafePerformIO()
 // Just([['searchTerm', 'wafflehouse']])
+
+// -- Mixing Metaphors ----------------------------------------------------------
+
+// read :: String -> IO String
+const read = filename => new IO(() => fs.readFileSync(filename, 'utf-8'))
+
+// print :: String -> IO String
+const print = x => new IO(() => {
+  console.log(x)
+  console.log('fooooooooooooooooooooooooo')
+  return x
+})
+
+// cat :: String -> IO (IO String)
+const cat = compose(map(print), read)
+
+cat('./.git/config')
+// IO(IO('[core]\nrepositoryformatversion = 0\n'))
+
+// catFirstChar :: String -> IO (IO String)
+const catFirstChar = compose(map(map(head)), cat)
+
+catFirstChar('./.git/config')
+// IO(IO('['))
+
+
+// firstAddressStreet :: User -> Maybe ( Maybe ( Maybe Street))
+const firstAddressStreet = compose(
+  map(map(safeProp('street'))),
+  map(safeHead),
+  safeProp('addresses')
+)
+
+firstAddressStreet({
+  addresses: [{ street: { name: 'Mulburry', number: 8402 }, postcode: 'WC2N' }]
+})
+// Maybe(Maybe(Maybe({name: 'Mulburry', number: 8402}))
+
+const mmo = Maybe.of(Maybe.of('nunchucks'))
+// Maybe(Maybe('nunchucks'))
+
+mmo.join()
+// Maybe('nunchucks')
+
+const ioio = IO.of(IO.of('pizza'))
+// IO(IO('pizza'))
+
+ioio.join()
+// IO('pizza')
+
+// firstaddressstreet2 :: User -> Maybe Street
+const firstAddressStreet2 = compose(
+  join,
+  map(safeProp('street')),
+  join,
+  map(safeHead),
+  safeProp('addresses')
+)
+
+firstAddressStreet2({
+  addresses: [{ street: { name: 'Mulburry', number: 8402 }, postcode: 'WC2N' }]
+})
+// Maybe({name: 'Mulburry', number: 8402})
+
+
+// firstaddressstreet3 :: User -> Maybe Street
+const firstAddressStreet3 = compose(
+  chain(safeProp('street')),
+  chain(safeHead),
+  safeProp('addresses')
+)
+
+Maybe.of(3)
+  .chain(three => Maybe.of(2).map(add(three)))
+// Maybe(5)
+
+Maybe.of(null)
+  .chain(safeProp('address'))
+  .chain(safeProp('street'))
+// Maybe(null)

@@ -15,5 +15,9 @@
   "bugs": {
     "url": "https://github.com/aykutyaman/mostly-workshop/issues"
   },
-  "homepage": "https://github.com/aykutyaman/mostly-workshop#readme"
+  "homepage": "https://github.com/aykutyaman/mostly-workshop#readme",
+  "dependencies": {
+    "data.task": "^3.1.2",
+    "moment": "^2.22.2"
+  }
 }

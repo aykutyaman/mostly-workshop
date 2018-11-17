@@ -20,6 +20,14 @@ class Maybe {
     return this.isNothing ? this : Maybe.of(f(this.$value))
   }
 
+  chain(fn) {
+    return this.map(fn).join()
+  }
+
+  join() {
+    return this.isNothing ? this : this.$value
+  }
+
   inspect() {
     return this.isNothing ? 'Nothing' : `Just(${inspect(this.$value)})`
   }
@@ -98,12 +106,16 @@ class IO {
     return new IO(compose(fn, this.unsafePerformIO))
   }
 
+  chain(fn) {
+    return this.map(fn).join()
+  }
+
   join() {
-    return this.$value()
+    return this.unsafePerformIO()
   }
 
   inspect() {
-    return `IO(${inspect(this.$value)})`
+    return `IO(?)`
   }
 }
 
